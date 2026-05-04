@@ -115,7 +115,7 @@ const Mascot = ({ character, status }: { character: string; status: 'CORRECT' | 
   return (
     <div className="relative w-32 h-32 md:w-48 md:h-48 mx-auto pointer-events-none flex items-center justify-center">
       <motion.img
-        src={`/${character}`}
+        src={`${import.meta.env.BASE_URL}${character}`}
         alt="Mascot"
         className="w-full h-full object-contain drop-shadow-xl"
         initial={{ y: 0 }}
@@ -344,9 +344,9 @@ export default function App() {
               }}
             >
               <div className={`${level.color} p-6 flex flex-col items-center justify-center text-white relative h-48`}>
-                <img 
-                  src={level.character} 
-                  alt={level.title} 
+                <img
+                  src={`${import.meta.env.BASE_URL}${level.character}`}
+                  alt={level.title}
                   className="w-32 h-32 object-contain group-hover:scale-110 transition-transform" 
                 />
                 <div className="absolute top-4 right-4 bg-white/20 p-2 rounded-full backdrop-blur-sm">
