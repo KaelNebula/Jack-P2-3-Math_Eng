@@ -24,14 +24,52 @@ import confetti from 'canvas-confetti';
 import { generateQuestionsPool } from './questions';
 
 // --- Assets ---
-const SOUND_URLS = {
-  CORRECT: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8417936a28.mp3', // Bright ding
-  WRONG: 'https://cdn.pixabay.com/audio/2022/03/10/audio_502758f84f.mp3', // Dull thud/buzzer
-  WIN: 'https://cdn.pixabay.com/audio/2021/08/04/audio_0625902157.mp3', // Fanfare
-  CLICK: 'https://cdn.pixabay.com/audio/2022/03/15/audio_29cc040c77.mp3'
+const MUSIC_URL = 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3';
+
+type SfxName = 'CORRECT' | 'WRONG' | 'WIN' | 'CLICK';
+
+let _audioCtx: AudioContext | null = null;
+const getAudioCtx = () => {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  return _audioCtx;
 };
 
-const MUSIC_URL = 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3';
+// Synthesize SFX with Web Audio API — no external URLs to break
+const synthesizeSfx = (name: SfxName) => {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+
+  const beep = (freq: number, start: number, dur: number, vol = 0.25, type: OscillatorType = 'sine') => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0 + start);
+    gain.gain.setValueAtTime(0, t0 + start);
+    gain.gain.linearRampToValueAtTime(vol, t0 + start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0 + start);
+    osc.stop(t0 + start + dur + 0.02);
+  };
+
+  switch (name) {
+    case 'CORRECT':
+      beep(880, 0, 0.12, 0.25, 'sine');     // A5
+      beep(1318, 0.1, 0.22, 0.25, 'sine');  // E6
+      break;
+    case 'WRONG':
+      beep(220, 0, 0.18, 0.25, 'square');   // A3 buzz
+      beep(165, 0.12, 0.25, 0.22, 'square'); // E3
+      break;
+    case 'WIN':
+      [523, 659, 784, 1047].forEach((f, i) => beep(f, i * 0.1, 0.35, 0.22, 'triangle')); // C-E-G-C arpeggio
+      break;
+    case 'CLICK':
+      beep(1500, 0, 0.04, 0.18, 'square');
+      break;
+  }
+};
 
 // --- Types ---
 type GameState = 'MENU' | 'LEVEL_SELECT' | 'PLAYING' | 'RESULT';
@@ -198,13 +236,11 @@ export default function App() {
     else musicRef.current.play().catch(() => {});
   }, [isMuted]);
 
-  // Sound Player
-  const playSound = useCallback((type: keyof typeof SOUND_URLS) => {
+  // Sound Player — synthesizes via Web Audio API
+  const playSound = useCallback((type: SfxName) => {
     ensureMusic();
     if (isMuted) return;
-    const audio = new Audio(SOUND_URLS[type]);
-    audio.volume = 0.4;
-    audio.play().catch(e => console.warn('Audio playback failed', e));
+    try { synthesizeSfx(type); } catch (e) { console.warn('SFX failed', e); }
   }, [isMuted, ensureMusic]);
 
   // Update random mascot whenever we go to menu
