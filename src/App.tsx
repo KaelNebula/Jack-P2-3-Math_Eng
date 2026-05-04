@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Trophy, 
   MapPin, 
@@ -30,6 +30,8 @@ const SOUND_URLS = {
   WIN: 'https://cdn.pixabay.com/audio/2021/08/04/audio_0625902157.mp3', // Fanfare
   CLICK: 'https://cdn.pixabay.com/audio/2022/03/15/audio_29cc040c77.mp3'
 };
+
+const MUSIC_URL = 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3';
 
 // --- Types ---
 type GameState = 'MENU' | 'LEVEL_SELECT' | 'PLAYING' | 'RESULT';
@@ -174,14 +176,36 @@ export default function App() {
   const [globalUsedQuestions, setGlobalUsedQuestions] = useState<Set<string>>(new Set());
   const [randomMascotIdx, setRandomMascotIdx] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Background music: lazy-init on first user interaction (autoplay policy)
+  const ensureMusic = useCallback(() => {
+    if (!musicRef.current) {
+      const audio = new Audio(MUSIC_URL);
+      audio.loop = true;
+      audio.volume = 0.15;
+      musicRef.current = audio;
+    }
+    if (!isMuted) {
+      musicRef.current.play().catch(() => {});
+    }
+  }, [isMuted]);
+
+  // React to mute toggle
+  useEffect(() => {
+    if (!musicRef.current) return;
+    if (isMuted) musicRef.current.pause();
+    else musicRef.current.play().catch(() => {});
+  }, [isMuted]);
 
   // Sound Player
   const playSound = useCallback((type: keyof typeof SOUND_URLS) => {
+    ensureMusic();
     if (isMuted) return;
     const audio = new Audio(SOUND_URLS[type]);
     audio.volume = 0.4;
     audio.play().catch(e => console.warn('Audio playback failed', e));
-  }, [isMuted]);
+  }, [isMuted, ensureMusic]);
 
   // Update random mascot whenever we go to menu
   useEffect(() => {
@@ -257,8 +281,11 @@ export default function App() {
 
   const VolumeToggle = () => (
     <div className="fixed top-6 right-6 z-50">
-      <button 
-        onClick={() => setIsMuted(!isMuted)}
+      <button
+        onClick={() => {
+          ensureMusic();
+          setIsMuted(m => !m);
+        }}
         className="p-3 bg-white/80 backdrop-blur rounded-full shadow-lg border-2 border-orange-200 text-orange-500 hover:bg-orange-50 transition-colors"
       >
         {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
@@ -294,8 +321,11 @@ export default function App() {
         收集星星，成為數學領航員！
       </p>
 
-      <button 
-        onClick={() => setGameState('LEVEL_SELECT')}
+      <button
+        onClick={() => {
+          playSound('CLICK');
+          setGameState('LEVEL_SELECT');
+        }}
         className="group relative px-10 py-5 bg-orange-500 text-white text-2xl font-bold rounded-2xl shadow-xl hover:bg-orange-600 active:scale-95 transition-all transform hover:-translate-y-1"
         id="start-btn"
       >
